@@ -82,7 +82,7 @@ class ManticoreConnector:
         """Delete a document from an index."""
         return self.utils_api.sql(f"DELETE FROM {index_name} WHERE _id={document_id}")
 
-    def create_index(self, index_name: str, field_defs: dict):
+    def create_index(self, index_name: str, field_defs: dict, index_defs: dict):
         """Create an index with specified field definitions."""
         field_strings = []
         for name, props in field_defs.items():
@@ -90,7 +90,9 @@ class ManticoreConnector:
             field_strings.append(f"{name} {field_type}")
 
         fields_clause = ", ".join(field_strings)
-        sql_query = f"CREATE TABLE IF NOT EXISTS {index_name} ({fields_clause})"
+        sql_query = f"CREATE TABLE IF NOT EXISTS {index_name} ({fields_clause})\n" + "\n".join(
+            f"{attr}={value}" for attr, value in index_defs.items()
+        )
         result = self.utils_api.sql(sql_query)
         return "error" not in result
 

@@ -29,6 +29,7 @@ class ManticoreIndexMeta(type):
         meta = attrs.pop("Meta", type("Meta", (), {}))
         index_name = getattr(meta, "index_name", name.lower())
         model = getattr(meta, "model", None)
+        index_settings = getattr(meta, "index_settings", {})
 
         # Collect fields
         fields = ()
@@ -50,6 +51,7 @@ class ManticoreIndexMeta(type):
 
         # Set required attributes
         attrs["_index_name"] = index_name
+        attrs["_index_settings"] = index_settings
         attrs["_model"] = model
         attrs["_fields"] = fields
         attrs["_fields_map"] = fields_map
@@ -77,6 +79,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
     _model: Type[Model]
     _fields: Tuple[ManticoreField]
     _field_weights: Optional[Dict[Union[str, int], Any]] = None
+    _index_settings: Optional[dict] = None
 
     def __init__(self):
         """Initialize Manticore index with connector and fields."""
@@ -260,6 +263,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         offset: int,
         limit: int,
         root_filters: dict | None = None,
+        aggregations: dict | None = None,
     ) -> Dict[str, Any]:
         """Build search payload from query components.
 
@@ -283,6 +287,8 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
         if root_filters:
             payload["query"].update(root_filters)
+        if aggregations:
+            payload["aggs"] = aggregations
 
         if highlight:
             payload["highlight"] = {
@@ -292,27 +298,26 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         if self._field_weights:
             payload["query"]["field_weights"] = self._field_weights
 
-        print(payload)
         return payload
 
     def search(
         self,
         query: Optional[str] = None,
-        match_fields: Optional[List[str]] = None,
         highlight: bool = True,
         limit: int = 20,
         offset: int = 0,
+        aggregations: dict | None = None,
         root_filters: dict | None = None,
     ):
         """Search the index with given query parameters.
 
         Args:
             query: Search query string
-            match_fields: Fields to search in
             highlight: Whether to enable highlighting
             limit: Result limit
             offset: Result offset
-
+            aggregations: Result aggregations
+            root_filters: Filters to use in query
         Returns:
             Search results
 
@@ -324,6 +329,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
             highlight=highlight,
             limit=limit,
             offset=offset,
+            aggregations=aggregations,
             root_filters=root_filters,
         )
 
