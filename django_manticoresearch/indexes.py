@@ -445,7 +445,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
     def create_index(self):
         """Create index with fields and configuration."""
-        self.manticore.create_index(index_name=self.index_name, field_defs=self.get_field_definitions())
+        self.manticore.create_index(
+            index_name=self.index_name, field_defs=self.get_field_definitions(), index_defs=self._index_settings
+        )
 
     def get_field_definitions(self) -> Dict[str, Dict[str, Any]]:
         """Get field definitions for index creation."""
