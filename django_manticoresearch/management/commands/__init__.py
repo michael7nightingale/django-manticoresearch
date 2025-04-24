@@ -1,1 +1,1 @@
-"""Management commands for django-manticoresearch.""" 
+"""Management commands for django-manticoresearch."""

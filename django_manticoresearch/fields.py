@@ -1,6 +1,7 @@
 """Field definitions for Manticore indexes."""
+
 from abc import ABC
-from typing import Any, Callable, Optional, Tuple, Union, Dict, List
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from django.db.models import Model
 from django.db.models.query_utils import DeferredAttribute
@@ -19,7 +20,6 @@ class ManticoreField(ABC):
         model_field: Optional[DeferredAttribute] = None,
         processor: Optional[Callable] = None,
         highlight_object_path: Optional[Tuple[str, ...]] = None,
-        null: bool = False,
         default: Any = None,
         primary_key: bool = False,
     ):
@@ -37,10 +37,9 @@ class ManticoreField(ABC):
         self.name = name
         self.model_field = model_field
         self.processor = processor
-        self.null = null
         self.default = default
         self.primary_key = primary_key
-        
+
         if highlight_object_path:
             self.highlight_object_path = highlight_object_path
         else:
@@ -143,21 +142,20 @@ class ManticoreField(ABC):
 
 class CharField(ManticoreField):
     """Text field for Manticore indexes."""
-    
-    field_type = "text"
+
     manticore_type = "text"
     default_processor = lambda self, value: str(value) if value is not None else ""
 
 
 class TextField(CharField):
     """Alias for CharField, for compatibility."""
+
     pass
 
 
 class TextArrayField(ManticoreField):
     """Text array field for Manticore indexes."""
 
-    field_type = "text"
     manticore_type = "text"
     default_processor = lambda self, value: ", ".join(str(v) for v in value) if value else ""
 
@@ -168,7 +166,6 @@ class TextArrayField(ManticoreField):
         processor: Optional[Callable] = None,
         highlight_object_path: Optional[Tuple[str, ...]] = None,
         separator: str = ", ",
-        null: bool = False,
         default: Any = None,
         primary_key: bool = False,
     ):
@@ -189,7 +186,6 @@ class TextArrayField(ManticoreField):
             model_field=model_field,
             processor=processor,
             highlight_object_path=highlight_object_path,
-            null=null,
             default=default,
             primary_key=primary_key,
         )
@@ -214,23 +210,22 @@ class TextArrayField(ManticoreField):
 
 class IntegerField(ManticoreField):
     """Integer field for Manticore indexes."""
-    
-    field_type = "integer"
+
     manticore_type = "bigint"
     default_processor = lambda self, value: int(value) if value is not None else 0
 
 
 class BigintField(IntegerField):
     """Alias for IntegerField, with correct manticore type."""
+
     pass
 
 
 class FloatField(ManticoreField):
     """Float field for Manticore indexes (stored as bigint in Manticore)."""
-    
-    field_type = "float"
-    manticore_type = "bigint"
-    
+
+    manticore_type = "float"
+
     def process(self, obj: Model) -> int:
         """Process float value to integer for Manticore."""
         value = super().process(obj)
@@ -240,59 +235,5 @@ class FloatField(ManticoreField):
             return 0
 
 
-class DateTimeField(ManticoreField):
-    """DateTime field for Manticore indexes (stored as timestamp)."""
-    
-    field_type = "timestamp"
-    manticore_type = "bigint"
-    
-    def process(self, obj: Model) -> int:
-        """Process datetime to timestamp."""
-        value = super().process(obj)
-        if value is None:
-            return 0
-        
-        # Handle both datetime objects and timestamp values
-        if hasattr(value, 'timestamp'):
-            return int(value.timestamp())
-        try:
-            return int(value)
-        except (ValueError, TypeError):
-            return 0
-
-
-class BooleanField(ManticoreField):
-    """Boolean field for Manticore indexes (stored as integer)."""
-    
-    field_type = "integer"
-    manticore_type = "bigint"
-    
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        model_field: Optional[DeferredAttribute] = None,
-        processor: Optional[Callable] = None,
-        highlight_object_path: Optional[Tuple[str, ...]] = None,
-        null: bool = False,
-        default: Any = None,
-        primary_key: bool = False,
-    ):
-        """Initialize boolean field."""
-        super().__init__(
-            name=name,
-            model_field=model_field,
-            processor=processor,
-            highlight_object_path=highlight_object_path,
-            null=null,
-            default=default,
-            primary_key=primary_key,
-        )
-        if self.default is not None:
-            self.default = 1 if self.default else 0
-    
-    def process(self, obj: Model) -> int:
-        """Process boolean value to integer."""
-        value = super().process(obj)
-        if value is None:
-            return 0
-        return 1 if value else 0 
+class MVAField(ManticoreField):
+    manticore_type = "multi"

@@ -1,8 +1,8 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="django-manticoresearch",
-    version="0.1.0",
+    version="0.2.0",
     packages=find_packages(),
     install_requires=[
         "django>=3.2",
@@ -23,4 +23,4 @@ setup(
         "Programming Language :: Python :: 3",
     ],
     python_requires=">=3.6",
-) 
+)

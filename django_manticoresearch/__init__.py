@@ -1,29 +1,29 @@
 """Django Manticoresearch package."""
 
-__version__ = '0.1.0'
+__version__ = "0.1.0"
 
-# Import StrEnum for match methods
-from enum import StrEnum
-
-# Import all field types
 from django_manticoresearch.fields import (
-    Field,
-    ManticoreField,
-    CharField,
-    TextField,
-    IntegerField,
     BigintField,
     BooleanField,
+    CharField,
     DateTimeField,
-    StringField,
-    MVAField,
+    IntegerField,
+    ManticoreField,
+    TextField,
 )
-
-# Import main classes from indexes module
 from django_manticoresearch.indexes import (
-    BaseManticoreIndex,
     ManticoreIndex,
-    IndexRegistry,
-    ManticoreMatchMethodEnum,
-    index_registry,
-) 
+)
+from django_manticoresearch.registry import index_registry
+
+__all__ = (
+    "BigintField",
+    "BooleanField",
+    "CharField",
+    "DateTimeField",
+    "IntegerField",
+    "ManticoreField",
+    "TextField",
+    "ManticoreIndex",
+    "index_registry",
+)

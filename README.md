@@ -32,12 +32,16 @@ MANTICORE_PORT = 9308
 
 ### Define Indices
 
+You can define indices using two different styles:
+
+#### Style 1: Tuple-based field definitions
+
 ```python
-from django_manticoresearch import BaseManticoreIndex, TextField, BigintField, index_registry
+from django_manticoresearch import ManticoreIndex, TextField, BigintField, index_registry
 from myapp.models import Post
 
 @index_registry.register
-class PostIndex(BaseManticoreIndex):
+class PostIndex(ManticoreIndex):
     _index_name = "posts"
     model = Post
     
@@ -52,6 +56,90 @@ class PostIndex(BaseManticoreIndex):
         "title": 10,
         "content": 5,
     }
+```
+
+#### Style 2: Class attribute field definitions
+
+```python
+from django_manticoresearch import ManticoreIndex, CharField, IntegerField, BooleanField
+from myapp.models import Post
+
+class PostIndex(ManticoreIndex):
+    title = CharField()
+    content = CharField()
+    views = IntegerField()
+    is_published = BooleanField(default=False)
+    
+    class Meta:
+        index_name = 'posts'
+        model = Post
+```
+
+### Field Definitions
+
+The following field types are available for defining index fields:
+
+```python
+class PostIndex(ManticoreIndex):
+    # Field definition in the fields tuple
+    fields = (
+        # Text fields for full-text search
+        TextField("title"),
+        TextField("content"),
+        
+        # Numeric fields
+        IntegerField("category_id"),
+        BigintField("views"),
+        
+        # Boolean field
+        BooleanField("is_published"),
+        
+        # Date/time field
+        DateTimeField("publication_date"),
+        
+        # String field (for exact match, not full-text)
+        StringField("slug"),
+        
+        # Multi-value array field
+        MVAField("tags"),
+    )
+```
+
+## Auto-Discovery of Indices
+
+By default, django-manticoresearch automatically discovers and registers indices from all installed apps. The package looks for index definitions in these files:
+
+1. `<app_name>/indexes.py`
+2. `<app_name>/indices.py` 
+
+To use auto-discovery:
+
+1. Create one of these files in your Django app
+2. Define your ManticoreIndex classes in that file
+3. No manual registration is needed
+
+Example app structure:
+```
+myapp/
+  ├── models.py
+  ├── views.py
+  └── indexes.py  # Your ManticoreIndex definitions go here
+```
+
+You can disable auto-discovery by setting `MANTICORE_AUTO_REGISTER_MODELS` to `False` in your Django settings:
+
+```python
+MANTICORE_AUTO_REGISTER_MODELS = False  # Default is True
+```
+
+If you disable auto-discovery, you'll need to manually register your indices:
+
+```python
+from django_manticoresearch import index_registry
+
+@index_registry.register
+class MyIndex(ManticoreIndex):
+    # Your index definition...
 ```
 
 ## Searching
@@ -113,4 +201,4 @@ python manage.py indexing --recreate
 - Field type validation and transformation
 - Rich query builder API
 - Highlighting support
-- Support for complex data structures # django-manticoresearch
+- Support for complex data structures
