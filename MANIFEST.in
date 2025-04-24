@@ -1,0 +1,4 @@
+include LICENSE
+include README.md
+recursive-include django_manticoresearch/templates *
+recursive-include django_manticoresearch/static * 
