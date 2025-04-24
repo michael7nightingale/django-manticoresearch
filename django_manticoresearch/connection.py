@@ -91,7 +91,7 @@ class ManticoreConnector:
 
         fields_clause = ", ".join(field_strings)
         sql_query = f"CREATE TABLE IF NOT EXISTS {index_name} ({fields_clause})\n" + "\n".join(
-            f"{attr}={value}" for attr, value in index_defs.items()
+            f"{attr}='{value}'" for attr, value in index_defs.items()
         )
         result = self.utils_api.sql(sql_query)
         return "error" not in result
