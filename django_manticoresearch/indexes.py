@@ -113,8 +113,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Returns:
             Full Manticore index name
         """
-        if getattr(settings, "DEBUG", False):
-            return "test_" + self._index_name
+        if getattr(settings, "MANTICORE_DEBUG_INDEX", False):
+            if getattr(settings, "DEBUG", False):
+                return getattr(settings, "MANTICORE_DEBUG_PREFIX", "test_") + self._index_name
         return self._index_name
 
     @staticmethod
