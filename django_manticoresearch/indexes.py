@@ -1,6 +1,10 @@
 """Manticore Search index classes and registry."""
 
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from backports.strenum import StrEnum
+
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import ndjson
