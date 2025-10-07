@@ -1,77 +1,51 @@
-[tool.black]
-line-length = 120
-target-version = ['py312']
-extend-exclude = '''
-(
-  .venv
-  venv
-)
-'''
-
-[tool.isort]
-profile = "black"
-line_length = 90
-multi_line_output = 3
-skip_gitignore = true
-skip_glob = []
-src_paths = ["src"]
-
-[tool.ruff]
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-    "migrations",
-    "old.py"
+[project]
+name = "django-manticoresearch"
+dynamic = ["version"]
+authors = [
+  { name="michael7nightingale", email="suslanchikmopl@gmail.com" },
+]
+description = "Django integration for Manticore Search"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Framework :: Django",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [
+    "django>=3.2",
+    "manticoresearch>=9.0.0",
+    "ndjson>=0.3.1",
 ]
 
-# Same as Black.
-line-length = 120
-indent-width = 4
+[project.urls]
+Homepage = "https://github.com/michael7nightingale/django-manticoresearch"
+Issues = "https://github.com/michael7nightingale/django-manticoresearch/issues"
 
-# Assume Python 3.8
-target-version = "py311"
+[project.optional-dependencies]
 
-[tool.ruff.lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
-select = ["E", "F", "W"]
-ignore = []
+[dependency-groups]
+dev = [
+    "pre-commit>=4.3.0",
+    "ruff>=0.13.3",
+]
 
-# Allow fix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-unfixable = []
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+[tool.hatch.build.targets.wheel]
+packages = ["django_manticoresearch"]
 
-[tool.ruff.format]
-# Like Black, use double quotes for strings.
-quote-style = "double"
+[tool.hatch.build.targets.sdist]
+include = ["/django_manticoresearch"]
 
-# Like Black, indent with spaces, rather than tabs.
-indent-style = "space"
+[tool.hatch.metadata]
+allow-direct-references = true
 
-# Like Black, respect magic trailing commas.
-skip-magic-trailing-comma = false
-
-# Like Black, automatically detect the appropriate line ending.
-line-ending = "auto"
+[tool.hatch.version]
+source = "regex"
+pattern = '__version__ = "(?P<version>[^"]+)"'
+path = "django_manticoresearch/version.py"

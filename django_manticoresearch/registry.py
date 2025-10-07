@@ -1,8 +1,9 @@
 from importlib import import_module
 from typing import List, Type
 
-from django.apps import apps
+import django.apps
 from django.utils.module_loading import module_has_submodule
+
 from django_manticoresearch import ManticoreIndex
 
 
@@ -36,11 +37,17 @@ class IndexRegistry:
         Looks for ManticoreIndex subclasses in a 'indexes.py' or 'indices.py'
         module in each installed app and registers them.
         """
-        for app_config in apps.get_app_configs():
-            if module_has_submodule(app_config.module, "indices") or module_has_submodule(app_config.module, "indexes"):
+        for app_config in django.apps.apps.get_app_configs():
+            if module_has_submodule(
+                app_config.module, "indices"
+            ) or module_has_submodule(app_config.module, "indexes"):
                 try:
                     # Try both common naming conventions
-                    module_name = "indices" if module_has_submodule(app_config.module, "indices") else "indexes"
+                    module_name = (
+                        "indices"
+                        if module_has_submodule(app_config.module, "indices")
+                        else "indexes"
+                    )
                     module = import_module(f"{app_config.name}.{module_name}")
 
                     # Find and register all ManticoreIndex subclasses

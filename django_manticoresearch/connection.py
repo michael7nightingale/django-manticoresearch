@@ -56,7 +56,11 @@ class ManticoreConnector:
     def search(self, index_name: str, query: str, **kwargs):
         """Basic search method for legacy compatibility."""
         return self.search_api.search(
-            {"index": index_name, "query": {"query_string": query}, "limit": kwargs.get("limit", 20)}
+            {
+                "index": index_name,
+                "query": {"query_string": query},
+                "limit": kwargs.get("limit", 20),
+            }
         )
 
     def insert(self, index_name: str, document: dict):
@@ -90,8 +94,9 @@ class ManticoreConnector:
             field_strings.append(f"{name} {field_type}")
 
         fields_clause = ", ".join(field_strings)
-        sql_query = f"CREATE TABLE IF NOT EXISTS {index_name} ({fields_clause})\n" + "\n".join(
-            f"{attr}='{value}'" for attr, value in index_defs.items()
+        sql_query = (
+            f"CREATE TABLE IF NOT EXISTS {index_name} ({fields_clause})\n"
+            + "\n".join(f"{attr}='{value}'" for attr, value in index_defs.items())
         )
         result = self.utils_api.sql(sql_query)
         return "error" not in result

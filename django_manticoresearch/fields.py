@@ -12,7 +12,15 @@ class ManticoreField(ABC):
 
     manticore_type: str
     default_processor: Callable = lambda self, value: value
-    __slots__ = ("name", "model_field", "processor", "highlight_object_path", "null", "default", "primary_key")
+    __slots__ = (
+        "name",
+        "model_field",
+        "processor",
+        "highlight_object_path",
+        "null",
+        "default",
+        "primary_key",
+    )
 
     def __init__(
         self,
@@ -81,7 +89,9 @@ class ManticoreField(ABC):
                         return self.default_processor(getattr(obj, self.name))
                     return self.default_processor(obj)
         except Exception as e:
-            raise Exception(f"Failed to process field {self.name} value for object: {obj}") from e
+            raise Exception(
+                f"Failed to process field {self.name} value for object: {obj}"
+            ) from e
 
     @classmethod
     def highlight_primitive(cls, index, highlight_fragment: str, data: Any) -> str:
@@ -123,7 +133,9 @@ class ManticoreField(ABC):
 
         if isinstance(data, list):
             return [
-                self.get_highlight_object_value(index, highlight_fragment, value_item, highlight_object_path)
+                self.get_highlight_object_value(
+                    index, highlight_fragment, value_item, highlight_object_path
+                )
                 for value_item in data
             ]
 
@@ -135,7 +147,10 @@ class ManticoreField(ABC):
         if isinstance(data, dict):
             if highlight_object_path_item in data:
                 data[highlight_object_path_item] = self.get_highlight_object_value(
-                    index, highlight_fragment, data[highlight_object_path_item], highlight_object_path[1:]
+                    index,
+                    highlight_fragment,
+                    data[highlight_object_path_item],
+                    highlight_object_path[1:],
                 )
             return data
 
@@ -144,7 +159,7 @@ class CharField(ManticoreField):
     """Text field for Manticore indexes."""
 
     manticore_type = "text"
-    default_processor = lambda self, value: str(value) if value is not None else ""
+    default_processor = lambda self, value: str(value) if value is not None else ""  # noqa: E731
 
 
 class TextField(CharField):
@@ -157,7 +172,9 @@ class TextArrayField(ManticoreField):
     """Text array field for Manticore indexes."""
 
     manticore_type = "text"
-    default_processor = lambda self, value: ", ".join(str(v) for v in value) if value else ""
+    default_processor = (  # noqa: E731
+        lambda self, value: ", ".join(str(v) for v in value) if value else ""
+    )
 
     def __init__(
         self,
@@ -212,7 +229,7 @@ class IntegerField(ManticoreField):
     """Integer field for Manticore indexes."""
 
     manticore_type = "bigint"
-    default_processor = lambda self, value: int(value) if value is not None else 0
+    default_processor = lambda self, value: int(value) if value is not None else 0  # noqa: E731
 
 
 class BigintField(IntegerField):

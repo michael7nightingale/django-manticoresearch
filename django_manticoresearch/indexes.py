@@ -7,6 +7,7 @@ import ndjson
 from django.conf import settings
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
+
 from django_manticoresearch.connection import ManticoreConnector
 from django_manticoresearch.fields import ManticoreField
 
@@ -118,7 +119,10 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         """
         if getattr(settings, "MANTICORE_DEBUG_INDEX", False):
             if getattr(settings, "DEBUG", False):
-                return getattr(settings, "MANTICORE_DEBUG_PREFIX", "test_") + self._index_name
+                return (
+                    getattr(settings, "MANTICORE_DEBUG_PREFIX", "test_")
+                    + self._index_name
+                )
         return self._index_name
 
     @staticmethod
@@ -155,7 +159,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         return escaped_query
 
     @staticmethod
-    def prepare_wildcard_query(query: str, prefix: bool = True, postfix: bool = True) -> str:
+    def prepare_wildcard_query(
+        query: str, prefix: bool = True, postfix: bool = True
+    ) -> str:
         """Prepare query for wildcard search by adding wildcards to terms.
 
         Args:
@@ -344,7 +350,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Returns:
             Django queryset of matching objects
         """
-        return self._model.objects.filter(id__in=[hit["_source"]["_id"] for hit in result.hits.hits])
+        return self._model.objects.filter(
+            id__in=[hit["_source"]["_id"] for hit in result.hits.hits]
+        )
 
     @classmethod
     def highlight_value(cls, fragment: str, value: str) -> str:
@@ -358,7 +366,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
             Highlighted value
         """
         return value.replace(
-            fragment.replace(cls._highlight_pre_tags, "").replace(cls._highlight_post_tags, "").strip(),
+            fragment.replace(cls._highlight_pre_tags, "")
+            .replace(cls._highlight_post_tags, "")
+            .strip(),
             fragment.strip(),
         )
 
@@ -381,15 +391,23 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         if not data or not highlight_map:
             return data
 
-        highlight_fields = [field for field in self._fields if field.name in highlight_map[data[0].get("id")]]
+        highlight_fields = [
+            field
+            for field in self._fields
+            if field.name in highlight_map[data[0].get("id")]
+        ]
 
         for obj in data:
             if obj.get("id") not in highlight_map:
                 highlight_data.append(obj)
                 continue
             for field in highlight_fields:
-                for highlight_fragment in highlight_map[obj.get("id")].get(field.name, []):
-                    obj = field.get_highlight_object_value(self, highlight_fragment, obj)
+                for highlight_fragment in highlight_map[obj.get("id")].get(
+                    field.name, []
+                ):
+                    obj = field.get_highlight_object_value(
+                        self, highlight_fragment, obj
+                    )
             highlight_data.append(obj)
 
         return highlight_data
@@ -446,7 +464,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
     def create_index(self):
         """Create index with fields and configuration."""
         self.manticore.create_index(
-            index_name=self.index_name, field_defs=self.get_field_definitions(), index_defs=self._index_settings
+            index_name=self.index_name,
+            field_defs=self.get_field_definitions(),
+            index_defs=self._index_settings,
         )
 
     def get_field_definitions(self) -> Dict[str, Dict[str, Any]]:
@@ -490,7 +510,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.error(f"Error deleting from index {cls._index_name} for {instance}: {e}")
+            logger.error(
+                f"Error deleting from index {cls._index_name} for {instance}: {e}"
+            )
 
     @classmethod
     def connect_signals(cls):

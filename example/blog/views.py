@@ -1,6 +1,7 @@
 """Example views for blog app."""
 
 from django.shortcuts import render
+
 from example.blog.indexes import PostIndex, PostIndexLegacy
 
 
@@ -15,7 +16,10 @@ def search_posts(request):
 
         # Search the index
         search_results = index.search(
-            query=query, match_fields=["title", "content"], enable_wildcard_search=True, infix_search=True
+            query=query,
+            match_fields=["title", "content"],
+            enable_wildcard_search=True,
+            infix_search=True,
         )
 
         # Convert results to QuerySet

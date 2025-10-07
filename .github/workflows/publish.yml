@@ -1,0 +1,64 @@
+name: Publish Package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install tomli
+      - name: Validate version
+        run: |
+          # Get version from version.py
+          VERSION=$(python -c "import django_manticoresearch.version; print(django_manticoresearch.version.__version__)")
+          # Get tag version (remove 'v' prefix if present)
+          TAG_VERSION=${GITHUB_REF#refs/tags/}
+          TAG_VERSION=${TAG_VERSION#v}
+          
+          if [ "$VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: version.py has $VERSION but release tag is $TAG_VERSION"
+            exit 1
+          fi
+          echo "Version validation successful: $VERSION"
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          python -m pip install --upgrade pip
+          pip install build twine
+      - name: Build package
+        run: python -m build
+      - name: Verify package structure
+        run: |
+          # Check if version.py exists and contains version
+          if ! grep -q '__version__' django_manticoresearch/version.py; then
+            echo "version.py missing or invalid"
+            exit 1
+          fi
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m twine upload dist/* 

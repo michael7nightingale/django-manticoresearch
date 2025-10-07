@@ -30,14 +30,21 @@ class ManticoreSearchConfig(AppConfig):
     def discover_indices(self):
         """Auto-discover indices in installed apps."""
         from django.apps import apps
+
         from django_manticoresearch.indexes import ManticoreIndex
         from django_manticoresearch.registry import index_registry
 
         for app_config in apps.get_app_configs():
-            if module_has_submodule(app_config.module, "indices") or module_has_submodule(app_config.module, "indexes"):
+            if module_has_submodule(
+                app_config.module, "indices"
+            ) or module_has_submodule(app_config.module, "indexes"):
                 try:
                     # Try both common naming conventions
-                    module_name = "indices" if module_has_submodule(app_config.module, "indices") else "indexes"
+                    module_name = (
+                        "indices"
+                        if module_has_submodule(app_config.module, "indices")
+                        else "indexes"
+                    )
                     module = import_module(f"{app_config.name}.{module_name}")
 
                     # Find and register all ManticoreIndex subclasses
@@ -49,7 +56,6 @@ class ManticoreSearchConfig(AppConfig):
                             and attr != ManticoreIndex
                             and hasattr(attr, "model")
                         ):
-
                             # Register the index
                             index_registry.register(attr)
                 except Exception as e:

@@ -10,9 +10,7 @@ from django_manticoresearch.fields import (
     MVAField,
     TextField,
 )
-from django_manticoresearch.indexes import (
-    ManticoreIndex,
-)
+from django_manticoresearch.indexes import ManticoreIndex
 from django_manticoresearch.registry import index_registry
 
 __all__ = (

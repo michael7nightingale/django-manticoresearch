@@ -4,6 +4,7 @@ from typing import Any, Dict, Type
 
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
+
 from django_manticoresearch.indexes import index_registry
 
 
