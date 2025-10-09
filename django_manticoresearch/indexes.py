@@ -8,11 +8,14 @@ except ImportError:
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import ndjson
+import logging
+
 from django.conf import settings
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django_manticoresearch.connection import ManticoreConnector
 from django_manticoresearch.fields import ManticoreField
+
 
 
 class ManticoreMatchMethodEnum(StrEnum):
@@ -24,6 +27,7 @@ class ManticoreMatchMethodEnum(StrEnum):
 
 class ManticoreIndexMeta(type):
     """Metaclass for ManticoreIndex that collects fields from class attributes."""
+    logger = logging.getLogger(__name__)
 
     def __new__(mcs, name, bases, attrs):
         if name == "ManticoreIndex":
@@ -85,6 +89,8 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
     _field_weights: Optional[Dict[Union[str, int], Any]] = None
     _index_settings: Optional[dict] = None
 
+    logger = logging.getLogger(__name__)
+
     def __init__(self):
         """Initialize Manticore index with connector and fields."""
         self.manticore = ManticoreConnector()
@@ -112,6 +118,8 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
             batch.append(obj)
         if batch:
             self.bulk(batch)
+        else:
+            return []
 
     @property
     def index_name(self) -> str:
@@ -227,7 +235,29 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Returns:
             Dictionary representation for Manticore
         """
-        return {field.name: field.process(obj) for field in self._fields}
+        id = None
+        document = {field.name: field.process(obj) for field in self._fields}
+
+        # # Убираем автоматическое добавление _id, если оно есть
+        if '_id' in document and isinstance(document['_id'], int):
+            id = document['_id']
+        #     document['id'] = document['_id']
+        #     del document['_id']
+        #
+        # print('document:', document)
+        #
+        # # Preserve original pk field name for integer primary keys
+        # if hasattr(obj, 'pk') and not isinstance(obj.pk, str):
+        #     # If _id is present in document (from auto-generated field),
+        #     # we need to ensure pk field preserves its original name
+        #     if '_id' in document:
+        #         # Remove _id from document since it's not needed for integer pk
+        #         document.pop('_id', None)
+        result = {
+            'id': id,
+            'doc': document
+        }
+        return result
 
     def insert(self, obj: Model):
         """Insert single object into index.
@@ -235,9 +265,12 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Args:
             obj: Django model instance
         """
+
+        self.logger.debug(f"Insert document: {self.obj_to_document(obj)}")
+
         self.manticore.insert(
             index_name=self.index_name,
-            document=self.obj_to_document(obj),
+            **self.obj_to_document(obj)
         )
 
     def bulk(self, queryset: Sequence[Model]):
@@ -246,13 +279,13 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Args:
             queryset: Sequence of Django model instances
         """
-        self.manticore.bulk(
+        return self.manticore.bulk(
             ndjson.dumps(
                 [
                     {
-                        "insert": {
+                        "replace": {
                             "index": self.index_name,
-                            "doc": self.obj_to_document(obj),
+                            **self.obj_to_document(obj),
                         }
                     }
                     for obj in queryset
@@ -445,11 +478,11 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
     def drop_index(self):
         """Drop index if it exists."""
-        self.raw(f"DROP TABLE IF EXISTS {self.index_name}")
+        return self.manticore.delete_index(index_name=self.index_name)
 
     def create_index(self):
         """Create index with fields and configuration."""
-        self.manticore.create_index(
+        return self.manticore.create_index(
             index_name=self.index_name, field_defs=self.get_field_definitions(), index_defs=self._index_settings
         )
 
@@ -466,22 +499,37 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
     def handle_save(cls, sender, instance, **kwargs):
         """Handle post_save signal."""
         index = cls()
+
+        # Проверяем, существует ли индекс, и создаем его при необходимости
+        try:
+            # Попробуем выполнить простой запрос к индексу
+            index.manticore.search_api.search({
+                "index": index.index_name,
+                "query": {"match_all": {}},
+                "limit": 1
+            })
+        except Exception as e:
+            # Если индекс не существует или пустой, создаем его
+            cls.logger.debug(f"Creating index error: {e}")
+            cls.logger.info(f"Creating index: {index.index_name}")
+            index.create_index()
+        print("123", kwargs)
+
         try:
             # Use the model's primary key as the document ID
             if kwargs.get("created", False):
                 # Insert new document
+                cls.logger.debug(f"Create document: {instance.__dict__}")
                 index.insert(instance)
             else:
                 # Update existing document
                 # First delete then insert to ensure it's updated properly
+                cls.logger.debug(f"Update document: {instance.__dict__}")
                 index.delete(instance)
                 index.insert(instance)
         except Exception as e:
             # Log the error instead of crashing
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error updating index {cls._index_name} for {instance}: {e}")
+            cls.logger.error(f"Error updating index {cls._index_name} for {instance}: {e}")
 
     @classmethod
     def handle_delete(cls, sender, instance, **kwargs):
@@ -491,10 +539,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
             index.delete(instance)
         except Exception as e:
             # Log the error instead of crashing
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error deleting from index {cls._index_name} for {instance}: {e}")
+            cls.logger.error(f"Error deleting from index {cls._index_name} for {instance}: {e}")
 
     @classmethod
     def connect_signals(cls):

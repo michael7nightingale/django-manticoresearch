@@ -1,11 +1,13 @@
 """Connection module for Manticore Search."""
 
 import manticoresearch
+from manticoresearch.models.insert_document_request import InsertDocumentRequest
 from django.conf import settings
-
+import logging
 
 class ManticoreConnector:
     """Connector class for Manticore Search services."""
+    logger = logging.getLogger(__name__)
 
     def __init__(
         self,
@@ -59,13 +61,14 @@ class ManticoreConnector:
             {"index": index_name, "query": {"query_string": query}, "limit": kwargs.get("limit", 20)}
         )
 
-    def insert(self, index_name: str, document: dict):
+    def insert(self, index_name: str, id:int, doc: dict):
         """Insert a document into an index."""
-        return self.index_api.insert(
-            {
-                "index": index_name,
-                "doc": document,
-            }
+        self.logger.debug(f"Insert document: id:{id}, doc: {doc}")
+        return self.index_api.insert(InsertDocumentRequest(
+                table=index_name,
+                id=id,
+                doc=doc
+            )
         )
 
     def update(self, index_name: str, document_id: int, document: dict):
@@ -80,7 +83,15 @@ class ManticoreConnector:
 
     def delete(self, index_name: str, document_id: int):
         """Delete a document from an index."""
-        return self.utils_api.sql(f"DELETE FROM {index_name} WHERE _id={document_id}")
+        self.utils_api.sql(f"DELETE FROM {index_name} WHERE _id={document_id}")
+
+    def delete_index(self, index_name):
+        """Drop index if it exists."""
+        sql_query = f"DROP TABLE IF EXISTS {index_name}"
+        result = self.utils_api.sql(sql_query)
+        self.logger.debug(f"Drop Index {index_name}, result: {result}")
+        return "error" not in result
+
 
     def create_index(self, index_name: str, field_defs: dict, index_defs: dict):
         """Create an index with specified field definitions."""
@@ -98,4 +109,5 @@ class ManticoreConnector:
 
     def bulk(self, bulk_data: str):
         """Execute a bulk operation."""
-        return self.index_api.bulk(bulk_data)
+        result = self.index_api.bulk(bulk_data)
+        return "error" not in result
