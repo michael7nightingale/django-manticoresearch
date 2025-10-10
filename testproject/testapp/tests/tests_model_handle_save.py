@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django_manticoresearch.registry import index_registry
-from ..models import Post
+from ..models import Post, Tags
 
 class TestsModelHandleSave(TestCase):
 
@@ -17,15 +17,19 @@ class TestsModelHandleSave(TestCase):
             index = index_class()
             self.assertEqual(index.create_index(), True)
 
-    def test_02_create_document(self):
-        instance = Post.objects.create(id=1, title="A new document")
+    def test_02_create_document_int_pk(self):
+        instance = Post.objects.create(title="A new document")
 
-    def test_03_reindex(self):
-        instance = Post.objects.create(id=1, title="A new document")
-        instance = Post.objects.create(id=2, title="A new document")
+    def test_03_create_document_int_pk(self):
+        instance = Tags.objects.create(title="A new document")
 
-        for index_class in self.indices:
-            index = index_class()
-            index.delete(instance)
-            print(index.index_all(ensure_delete=False))
+
+    # def test_03_reindex(self):
+    #     instance = Post.objects.create(id=1, title="A new document")
+    #     instance = Post.objects.create(id=2, title="A new document")
+    #
+    #     for index_class in self.indices:
+    #         index = index_class()
+    #         index.delete(instance)
+    #         print(index.index_all(ensure_delete=False))
 

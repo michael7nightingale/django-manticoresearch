@@ -12,11 +12,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import sys
 from pathlib import Path
 import textwrap
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 sys.path.append(str(BASE_DIR) + "/../")
+environ.Env.read_env(BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -24,8 +26,13 @@ sys.path.append(str(BASE_DIR) + "/../")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-8$oaj4oc)zlnad-!+)e-^(yzu^%q#a@u&*_x7d@7^pa-3w7phl'
 
+env = environ.Env(
+    # set casting, default value
+    DEBUG=(bool, False)
+)
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = []
 
@@ -124,7 +131,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 def filter_textwrap(record):
-    #print(record.__dict__)
+    record.pathname = record.pathname.replace(str(BASE_DIR)+'/../', '')
     record.msg=textwrap.shorten(record.msg,width=140, placeholder="...")
     return True
 
@@ -133,7 +140,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'simple': {
-            'format': '%(levelname)s %(name)s.%(funcName)s:%(lineno)s- %(message)s'
+            'format': '%(levelname)s %(pathname)s:%(lineno)d %(name)s.%(funcName)s:%(lineno)s- %(message)s'
         },
     },
     'filters': {
@@ -144,28 +151,21 @@ LOGGING = {
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
             'filters': ['filter_textwrap'],
         },
     },
     'loggers': {
-        # 'django.test': {
-        #     'handlers': ['console'],
-        #     'level': 'DEBUG',
-        #     'propagate': True,
-        # },
-
         'django_manticoresearch': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'WARNING',
             'propagate': True,
-
         },
     },
 }
 
-MANTICORE_SCHEMA = "http"
-MANTICORE_HOST = "192.168.1.94"
-MANTICORE_PORT = 9308
+MANTICORE_SCHEMA = env('MANTICORE_SCHEMA', default='http')
+MANTICORE_HOST = env('MANTICORE_HOST', default='localhost')
+MANTICORE_PORT = env.int('MANTICORE_PORT', default=9308)
+MANTICORE_HARD_EXIT = env.bool('MANTICORE_HARD_EXIT', False)

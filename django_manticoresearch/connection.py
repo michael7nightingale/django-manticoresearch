@@ -14,6 +14,7 @@ class ManticoreConnector:
         schema: str | None = None,
         host: str | None = None,
         port: int | None = None,
+        hard_exit: int | None = None,
     ):
         """Initialize Manticore connector with connection parameters.
 
@@ -28,12 +29,16 @@ class ManticoreConnector:
             host = getattr(settings, "MANTICORE_HOST", "localhost")
         if port is None:
             port = getattr(settings, "MANTICORE_PORT", 9308)
+        if hard_exit is None:
+            hard_exit = getattr(settings, "MANTICORE_HARD_EXIT", False)
+
         connection_string = f"{schema}://{host}:{port}"
         self._config = manticoresearch.Configuration(host=connection_string)
         self._client = manticoresearch.ApiClient(self.config)
         self._search_api = manticoresearch.SearchApi(self.client)
         self._index_api = manticoresearch.IndexApi(self.client)
         self._utils_api = manticoresearch.UtilsApi(self.client)
+        self.hard_exit=hard_exit
 
     @property
     def config(self) -> manticoresearch.Configuration:
@@ -61,10 +66,26 @@ class ManticoreConnector:
             {"index": index_name, "query": {"query_string": query}, "limit": kwargs.get("limit", 20)}
         )
 
+    def search_raw(self, index_name: str, query: str, **kwargs):
+        """Basic search method for legacy compatibility."""
+        return self.search_api.search(
+            {"index": index_name, "query": query, "limit": kwargs.get("limit", 20)}
+        )
+
     def insert(self, index_name: str, id:int, doc: dict):
         """Insert a document into an index."""
         self.logger.debug(f"Insert document: id:{id}, doc: {doc}")
         return self.index_api.insert(InsertDocumentRequest(
+                table=index_name,
+                id=id,
+                doc=doc
+            )
+        )
+
+    def replace(self, index_name: str, id:int, doc: dict):
+        """Rerlace a document into an index."""
+        self.logger.debug(f"Replace document: id:{id}, doc: {doc}")
+        return self.index_api.replace(InsertDocumentRequest(
                 table=index_name,
                 id=id,
                 doc=doc

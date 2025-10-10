@@ -10,6 +10,7 @@ click==8.1.8
 cryptography==44.0.2
 dill==0.4.0
 Django==5.2
+django-environ==0.12.0
 docutils==0.21.2
 id==1.5.0
 idna==3.10
@@ -20,7 +21,7 @@ jaraco.context==6.0.1
 jaraco.functools==4.1.0
 jeepney==0.9.0
 keyring==25.6.0
-manticoresearch==8.0.0
+manticoresearch==9.0.0
 markdown-it-py==3.0.0
 mccabe==0.7.0
 mdurl==0.1.2
@@ -30,7 +31,7 @@ ndjson==0.3.1
 nh3==0.2.21
 packaging==25.0
 pathspec==0.12.1
-platformdirs==4.3.7
+platformdirs
 pycparser==2.22
 pydantic==2.11.3
 pydantic_core==2.33.1
@@ -50,7 +51,7 @@ sqlparse==0.5.3
 tomli==2.2.1
 tomlkit==0.13.3
 twine==6.1.0
-typing-inspection==0.4.0
+typing-inspection
 typing_extensions==4.13.2
 urllib3==2.0.7
 zipp==3.23.0

@@ -49,11 +49,34 @@ class ManticoreIndexMeta(type):
                 # if not hasattr(value, "name") or not value.name:
                 #     value.name = key
 
-        has_id_field = any(field.name == "_id" for field in fields)
-        if not has_id_field:
-            from django_manticoresearch.fields import BigintField
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        if model:
+            # Получаем объект поля первичного ключа из мета-информации модели
+            pk_field = model._meta.pk
 
-            fields = (BigintField("_id", processor=lambda obj: obj.id),) + fields
+            # Список типов полей, которые мы считаем целочисленными
+            integer_pk_types = ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField')
+
+            if pk_field.get_internal_type() in integer_pk_types:
+                # PK - целочисленный. Используем его для ID документа Manticore.
+                from django_manticoresearch.fields import BigintField
+                # Используем obj.pk вместо obj.id для универсальности
+                id_field = BigintField("_pk", processor=lambda obj: obj.pk)
+            else:
+                # PK - не целочисленный (UUID, CharField и т.д.).
+                # Сохраняем его значение в строковое поле Manticore с именем `_id`.
+                # ID самого документа будет назначен Manticore автоматически.
+                from django_manticoresearch.fields import TextField
+                id_field = TextField("_pk", processor=lambda obj: str(obj.pk))
+        else:
+            # Если модель не указана, возвращаемся к старому поведению по умолчанию.
+            from django_manticoresearch.fields import BigintField
+            id_field = BigintField("_pk", processor=lambda obj: obj.id)
+
+        # Добавляем созданное поле в начало кортежа полей
+        if id_field:
+            fields = (id_field,) + fields
+        # --- КОНЕЦ ИЗМЕНЕНИЙ --
 
         fields_map = {field.name: field for field in fields}
 
@@ -91,9 +114,14 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
     logger = logging.getLogger(__name__)
 
+
     def __init__(self):
         """Initialize Manticore index with connector and fields."""
         self.manticore = ManticoreConnector()
+
+        global hard_exit
+        hard_exit=self.manticore.hard_exit
+
 
     def get_queryset(self):
         """Get queryset of objects to index.
@@ -238,21 +266,34 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         id = None
         document = {field.name: field.process(obj) for field in self._fields}
 
-        # # Убираем автоматическое добавление _id, если оно есть
-        if '_id' in document and isinstance(document['_id'], int):
-            id = document['_id']
-        #     document['id'] = document['_id']
-        #     del document['_id']
-        #
-        # print('document:', document)
-        #
-        # # Preserve original pk field name for integer primary keys
-        # if hasattr(obj, 'pk') and not isinstance(obj.pk, str):
-        #     # If _id is present in document (from auto-generated field),
-        #     # we need to ensure pk field preserves its original name
-        #     if '_id' in document:
-        #         # Remove _id from document since it's not needed for integer pk
-        #         document.pop('_id', None)
+        integer_pk_types = ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField')
+        pk_field = obj._meta.pk
+
+        if pk_field.get_internal_type() in integer_pk_types:
+            id = obj.pk
+        else:
+            payload = {
+                "index_name": self.index_name,
+                "query": {
+                    "match":{
+                        "_pk": str(obj.pk)
+                    }
+                },
+                "limit": 1
+            }
+            print('!!!!!!!!!!!!!', payload)
+            try:
+                print(self.manticore.search_raw(**payload))
+
+            except Exception as e:
+                error_text = f"Error getting primary key index {self.index_name} for {document}: {e}"
+                self.logger.error(error_text)
+                id = None
+                if hard_exit:
+                    raise Exception(error_text)
+
+
+
         result = {
             'id': id,
             'doc': document
@@ -269,6 +310,20 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         self.logger.debug(f"Insert document: {self.obj_to_document(obj)}")
 
         self.manticore.insert(
+            index_name=self.index_name,
+            **self.obj_to_document(obj)
+        )
+
+    def replace(self, obj: Model):
+        """Replace single object into index.
+
+        Args:
+            obj: Django model instance
+        """
+
+        self.logger.debug(f"Replace document: {self.obj_to_document(obj)}")
+
+        self.manticore.replace(
             index_name=self.index_name,
             **self.obj_to_document(obj)
         )
@@ -482,6 +537,8 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
     def create_index(self):
         """Create index with fields and configuration."""
+        self.logger.info(f"Creating index {self.index_name}")
+
         return self.manticore.create_index(
             index_name=self.index_name, field_defs=self.get_field_definitions(), index_defs=self._index_settings
         )
@@ -501,35 +558,39 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         index = cls()
 
         # Проверяем, существует ли индекс, и создаем его при необходимости
-        try:
+        #try:
             # Попробуем выполнить простой запрос к индексу
-            index.manticore.search_api.search({
-                "index": index.index_name,
-                "query": {"match_all": {}},
-                "limit": 1
-            })
-        except Exception as e:
-            # Если индекс не существует или пустой, создаем его
-            cls.logger.debug(f"Creating index error: {e}")
-            cls.logger.info(f"Creating index: {index.index_name}")
-            index.create_index()
-        print("123", kwargs)
+        #     index.manticore.search_api.search({
+        #         "index": index.index_name,
+        #         "query": {"match_all": {}},
+        #         "limit": 1
+        #     })
+        # except Exception as e:
+        #     # Если индекс не существует или пустой, создаем его
+        #     cls.logger.debug(f"Creating index error: {e}")
+        #     cls.logger.info(f"Creating index: {index.index_name}")
+        #     index.create_index()
+        #print("123", kwargs)
 
         try:
             # Use the model's primary key as the document ID
-            if kwargs.get("created", False):
-                # Insert new document
-                cls.logger.debug(f"Create document: {instance.__dict__}")
-                index.insert(instance)
-            else:
-                # Update existing document
-                # First delete then insert to ensure it's updated properly
-                cls.logger.debug(f"Update document: {instance.__dict__}")
-                index.delete(instance)
-                index.insert(instance)
+            # if kwargs.get("created", False):
+            #     # Insert new document
+            #     cls.logger.debug(f"Create document: {instance.__dict__}")
+            #     index.insert(instance)
+            # else:
+            #     # Update existing document
+            #     # First delete then insert to ensure it's updated properly
+            #     cls.logger.debug(f"Update document: {instance.__dict__}")
+            #     index.delete(instance)
+            #     index.insert(instance)
+            index.replace(instance)
         except Exception as e:
             # Log the error instead of crashing
-            cls.logger.error(f"Error updating index {cls._index_name} for {instance}: {e}")
+            error_text=f"Error insert or updating index {cls._index_name} for {instance}: {e}"
+            cls.logger.error(error_text)
+            if hard_exit:
+                raise Exception(error_text)
 
     @classmethod
     def handle_delete(cls, sender, instance, **kwargs):

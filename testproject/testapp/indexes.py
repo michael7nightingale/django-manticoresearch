@@ -10,6 +10,7 @@ from django_manticoresearch import (
     ManticoreIndex,
 )
 from .models.post_model import Post
+from .models.tags_model import Tags
 
 
 # @index_registry.register
@@ -35,7 +36,7 @@ from .models.post_model import Post
 
 
 # Example using the original style with field attributes
-class PostIndexLegacy(ManticoreIndex):
+class PostIndex(ManticoreIndex):
     """Index for blog posts using the original attribute-based API."""
 
     title = CharField()
@@ -45,5 +46,14 @@ class PostIndexLegacy(ManticoreIndex):
     #is_featured = BooleanField(default=False)
 
     class Meta:
-        index_name = "blog_posts_legacy"
+        index_name = "blog_posts"
         model = Post
+
+
+class TagsIndex(ManticoreIndex):
+    """Index for blog posts using the original attribute-based API."""
+    title = CharField()
+
+    class Meta:
+        index_name = "blog_tags"
+        model = Tags
