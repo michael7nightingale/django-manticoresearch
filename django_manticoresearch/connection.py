@@ -68,8 +68,10 @@ class ManticoreConnector:
 
     def search_raw(self, index_name: str, query: str, **kwargs):
         """Basic search method for legacy compatibility."""
+        self.logger.debug(f"Search RAW index: {index_name}, query: {query}")
+
         return self.search_api.search(
-            {"index": index_name, "query": query, "limit": kwargs.get("limit", 20)}
+            {"table": index_name, "query": query, "limit": kwargs.get("limit", 20)}
         )
 
     def insert(self, index_name: str, id:int, doc: dict):

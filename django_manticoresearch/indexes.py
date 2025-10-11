@@ -14,7 +14,7 @@ from django.conf import settings
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django_manticoresearch.connection import ManticoreConnector
-from django_manticoresearch.fields import ManticoreField
+from django_manticoresearch.fields import ManticoreField, BigintField, TextField
 
 
 
@@ -59,18 +59,18 @@ class ManticoreIndexMeta(type):
 
             if pk_field.get_internal_type() in integer_pk_types:
                 # PK - целочисленный. Используем его для ID документа Manticore.
-                from django_manticoresearch.fields import BigintField
+                #from django_manticoresearch.fields import BigintField
                 # Используем obj.pk вместо obj.id для универсальности
                 id_field = BigintField("_pk", processor=lambda obj: obj.pk)
             else:
                 # PK - не целочисленный (UUID, CharField и т.д.).
                 # Сохраняем его значение в строковое поле Manticore с именем `_id`.
                 # ID самого документа будет назначен Manticore автоматически.
-                from django_manticoresearch.fields import TextField
+                #from django_manticoresearch.fields import TextField
                 id_field = TextField("_pk", processor=lambda obj: str(obj.pk))
         else:
             # Если модель не указана, возвращаемся к старому поведению по умолчанию.
-            from django_manticoresearch.fields import BigintField
+            #from django_manticoresearch.fields import BigintField
             id_field = BigintField("_pk", processor=lambda obj: obj.id)
 
         # Добавляем созданное поле в начало кортежа полей
@@ -254,6 +254,44 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
         return " | ".join(result_patterns) if terms else f"*{query}*"
 
+    def search_pk(self, pk):
+        integer_pk_types = ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField')
+
+        pk_manticore_field = self._fields[0]
+
+        if isinstance(pk, BigintField):
+            return pk
+        else:
+            payload = {
+                "index_name": self.index_name,
+                "query": {
+                    "match": {
+                        "_pk": str(pk)
+                    }
+                },
+                "limit": 1
+            }
+            print('payload',payload)
+            try:
+                search_result = self.manticore.search_raw(**payload)
+
+                if search_result and search_result.hits and search_result.hits.hits:
+                    # Документ найден, используем его Manticore-generated ID для операции
+                    # Доступ к _id через атрибут, а не ключ словаря
+                    self.logger.debug(f"Found existing Manticore ID {id} for _pk={pk}")
+                    return search_result.hits.hits[0].id
+                else:
+                    # Документ не найден, это новая вставка для Manticore, оставляем id=0
+                    self.logger.debug(f"Document with _pk={pk} not found in Manticore, will insert with auto-id.")
+                    return None
+            except Exception as e:
+                error_text=f"Error getting primary key index {self.index_name} for pk: {pk} error: {e}"
+                self.logger.error(error_text)
+                if hard_exit:
+                    raise Exception(error_text)
+                return None
+
+
     def obj_to_document(self, obj: Model) -> Dict[str, Any]:
         """Convert model object to Manticore document.
 
@@ -263,36 +301,9 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Returns:
             Dictionary representation for Manticore
         """
-        id = None
+
         document = {field.name: field.process(obj) for field in self._fields}
-
-        integer_pk_types = ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField')
-        pk_field = obj._meta.pk
-
-        if pk_field.get_internal_type() in integer_pk_types:
-            id = obj.pk
-        else:
-            payload = {
-                "index_name": self.index_name,
-                "query": {
-                    "match":{
-                        "_pk": str(obj.pk)
-                    }
-                },
-                "limit": 1
-            }
-            print('!!!!!!!!!!!!!', payload)
-            try:
-                print(self.manticore.search_raw(**payload))
-
-            except Exception as e:
-                error_text = f"Error getting primary key index {self.index_name} for {document}: {e}"
-                self.logger.error(error_text)
-                id = None
-                if hard_exit:
-                    raise Exception(error_text)
-
-
+        id = self.search_pk(obj.pk)
 
         result = {
             'id': id,
@@ -321,7 +332,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
             obj: Django model instance
         """
 
-        self.logger.debug(f"Replace document: {self.obj_to_document(obj)}")
+        self.logger.debug(f"Replace document: {obj.__dict__}")
 
         self.manticore.replace(
             index_name=self.index_name,
@@ -557,33 +568,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         """Handle post_save signal."""
         index = cls()
 
-        # Проверяем, существует ли индекс, и создаем его при необходимости
-        #try:
-            # Попробуем выполнить простой запрос к индексу
-        #     index.manticore.search_api.search({
-        #         "index": index.index_name,
-        #         "query": {"match_all": {}},
-        #         "limit": 1
-        #     })
-        # except Exception as e:
-        #     # Если индекс не существует или пустой, создаем его
-        #     cls.logger.debug(f"Creating index error: {e}")
-        #     cls.logger.info(f"Creating index: {index.index_name}")
-        #     index.create_index()
-        #print("123", kwargs)
-
         try:
-            # Use the model's primary key as the document ID
-            # if kwargs.get("created", False):
-            #     # Insert new document
-            #     cls.logger.debug(f"Create document: {instance.__dict__}")
-            #     index.insert(instance)
-            # else:
-            #     # Update existing document
-            #     # First delete then insert to ensure it's updated properly
-            #     cls.logger.debug(f"Update document: {instance.__dict__}")
-            #     index.delete(instance)
-            #     index.insert(instance)
             index.replace(instance)
         except Exception as e:
             # Log the error instead of crashing
