@@ -122,7 +122,6 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         global hard_exit
         hard_exit=self.manticore.hard_exit
 
-
     def get_queryset(self):
         """Get queryset of objects to index.
 
@@ -255,11 +254,10 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         return " | ".join(result_patterns) if terms else f"*{query}*"
 
     def search_pk(self, pk):
-        integer_pk_types = ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField')
 
         pk_manticore_field = self._fields[0]
 
-        if isinstance(pk, BigintField):
+        if isinstance(pk_manticore_field, BigintField):
             return pk
         else:
             payload = {
@@ -271,7 +269,6 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
                 },
                 "limit": 1
             }
-            print('payload',payload)
             try:
                 search_result = self.manticore.search_raw(**payload)
 
@@ -290,7 +287,6 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
                 if hard_exit:
                     raise Exception(error_text)
                 return None
-
 
     def obj_to_document(self, obj: Model) -> Dict[str, Any]:
         """Convert model object to Manticore document.

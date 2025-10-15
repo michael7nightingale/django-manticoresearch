@@ -2,6 +2,7 @@ from django.test import TestCase
 from django_manticoresearch.registry import index_registry
 from django_manticoresearch.indexes import ManticoreIndex
 from ..models import Post, Tags
+from ..indexes import PostIndex
 
 class TestsModelHandleSave(TestCase):
 
@@ -18,25 +19,33 @@ class TestsModelHandleSave(TestCase):
             index = index_class()
             self.assertEqual(index.create_index(), True)
 
-    def test_02_create_document_int_pk(self):
-        instance = Post.objects.create(title="A new document")
-
-        index = ManticoreIndex()
-        index._index_name = 'blog_posts'
-        print('pk', instance.pk)
-        print('index pk', index.search_pk(pk=instance.pk))
+    def test_02_00_create_document_int_pk(self):
+        id = 1
+        instance = Post.objects.create(id=id,title="A new document")
+        index = PostIndex()
+        self.assertEqual(index.search_pk(pk=id), id)
 
         instance.title='A new document2'
         instance.save()
+
+        search_result = index.raw(body=f'select title from `blog_posts` where _pk={id}')
+        self.assertEqual(search_result.actual_instance[0]['data'][0]['title'],instance.title)
 
 
     def test_03_create_document_random_pk(self):
-        instance = Tags.objects.create(
-            uuid='642d92be-f309-4c4a-9c72-3ceaf43afe1d',title="A new document")
+        id = '642d92be-f309-4c4a-9c72-3ceaf43afe1d'
+        instance = Tags.objects.create(uuid=id,title="A new document")
+
+        index = PostIndex()
+        print('dddddd', index.search_pk(pk=id))
+        self.assertEqual(index.search_pk(pk=id), id)
+
         instance.title='A new document2'
         instance.save()
 
-        #print('instance pk', instance.pk)
+        search_result = index.raw(body=f'select title from `blog_tags` where _pk={id}')
+        print(search_result)
+        self.assertEqual(search_result.actual_instance[0]['data'][0]['title'],instance.title)
 
 
     # def test_03_reindex(self):
