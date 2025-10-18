@@ -37,14 +37,12 @@ class TestsModelHandleSave(TestCase):
         instance = Tags.objects.create(uuid=id,title="A new document")
 
         index = PostIndex()
-        print('dddddd', index.search_pk(pk=id))
         self.assertEqual(index.search_pk(pk=id), id)
 
         instance.title='A new document2'
         instance.save()
 
-        search_result = index.raw(body=f'select title from `blog_tags` where _pk={id}')
-        print(search_result)
+        search_result = index.raw(body=f'select title from `blog_tags` where `title`=\'{instance.title}\'')
         self.assertEqual(search_result.actual_instance[0]['data'][0]['title'],instance.title)
 
 

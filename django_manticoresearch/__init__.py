@@ -9,6 +9,9 @@ from django_manticoresearch.fields import (
     ManticoreField,
     MVAField,
     TextField,
+    BooleanField,
+    DateField,
+    DateTimeField,
 )
 from django_manticoresearch.indexes import (
     ManticoreIndex,
@@ -22,6 +25,9 @@ __all__ = (
     "ManticoreField",
     "TextField",
     "MVAField",
+    "BooleanField",
+    "DateField",
+    "DateTimeField",
     "ManticoreIndex",
     "index_registry",
 )

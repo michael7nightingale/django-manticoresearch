@@ -3,9 +3,11 @@
 # Import for original style index
 from django_manticoresearch import (
     #BaseManticoreIndex,
-    #BooleanField,
+    BooleanField,
     CharField,
-    #DateTimeField,
+    DateField,
+    DateTimeField,
+    TextField,
     IntegerField,
     ManticoreIndex,
 )
@@ -13,37 +15,16 @@ from .models.post_model import Post
 from .models.tags_model import Tags
 
 
-# @index_registry.register
-# class PostIndex(BaseManticoreIndex):
-#     """Index for blog posts using the new API."""
-#
-#     _index_name = "blog_posts"
-#     model = Post
-#
-#     # Field definitions
-#     fields = (
-#         TextField("title"),
-#         TextField("content"),
-#         DateTimeField("pub_date"),
-#         BigintField("views"),
-#     )
-#
-#     # Optional field weights for relevance scoring
-#     field_weights = {
-#         "title": 10,
-#         "content": 5,
-#     }
-
-
 # Example using the original style with field attributes
 class PostIndex(ManticoreIndex):
     """Index for blog posts using the original attribute-based API."""
 
     title = CharField()
-    content = CharField()
-    #pub_date = DateTimeField()
+    content = TextField()
+    #pub_date = DateField()
+    #pub_date_time = DateTimeField()
     views = IntegerField()
-    #is_featured = BooleanField(default=False)
+    is_featured = BooleanField(default=False)
 
     class Meta:
         index_name = "blog_posts"

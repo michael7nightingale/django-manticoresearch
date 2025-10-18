@@ -44,12 +44,7 @@ class ManticoreIndexMeta(type):
         for key, value in list(attrs.items()):
             if isinstance(value, ManticoreField):
                 fields = fields + (value,)
-                # fields[key] = value
-                # Set field name if not already set
-                # if not hasattr(value, "name") or not value.name:
-                #     value.name = key
 
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
         if model:
             # Получаем объект поля первичного ключа из мета-информации модели
             pk_field = model._meta.pk
@@ -64,7 +59,7 @@ class ManticoreIndexMeta(type):
                 id_field = BigintField("_pk", processor=lambda obj: obj.pk)
             else:
                 # PK - не целочисленный (UUID, CharField и т.д.).
-                # Сохраняем его значение в строковое поле Manticore с именем `_id`.
+                # Сохраняем его значение в строковое поле Manticore с именем `_pk`.
                 # ID самого документа будет назначен Manticore автоматически.
                 #from django_manticoresearch.fields import TextField
                 id_field = TextField("_pk", processor=lambda obj: str(obj.pk))
@@ -76,7 +71,7 @@ class ManticoreIndexMeta(type):
         # Добавляем созданное поле в начало кортежа полей
         if id_field:
             fields = (id_field,) + fields
-        # --- КОНЕЦ ИЗМЕНЕНИЙ --
+
 
         fields_map = {field.name: field for field in fields}
 
