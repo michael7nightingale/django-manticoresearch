@@ -19,17 +19,26 @@ from .models.tags_model import Tags
 class PostIndex(ManticoreIndex):
     """Index for blog posts using the original attribute-based API."""
 
-    title = CharField()
-    content = TextField()
+#    title = CharField()
+#    content = TextField()
     #pub_date = DateField()
     #pub_date_time = DateTimeField()
-    views = IntegerField()
-    is_featured = BooleanField(default=False)
+#    views = IntegerField()
+#    is_featured = BooleanField(default=False)
+
+
+
 
     class Meta:
         index_name = "blog_posts"
         model = Post
 
+        fields = (
+            CharField("title"),
+            TextField("content"),
+            IntegerField("views"),
+            BooleanField("is_featured")
+        )
 
 class TagsIndex(ManticoreIndex):
     """Index for blog posts using the original attribute-based API."""

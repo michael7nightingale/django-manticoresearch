@@ -21,7 +21,7 @@ class TestsModelHandleSave(TestCase):
 
     def test_02_00_create_document_int_pk(self):
         id = 1
-        instance = Post.objects.create(id=id,title="A new document")
+        instance = Post.objects.create(id=id, title="Snow!", content="What often falls at the North Pole but never gets hurt?")
         index = PostIndex()
         self.assertEqual(index.search_pk(pk=id), id)
 
@@ -31,6 +31,8 @@ class TestsModelHandleSave(TestCase):
         search_result = index.raw(body=f'select title from `blog_posts` where _pk={id}')
         self.assertEqual(search_result.actual_instance[0]['data'][0]['title'],instance.title)
 
+        #search_result = index.raw(body="select title from `blog_posts` where match('1')")
+        #print(search_result)
 
     def test_03_create_document_random_pk(self):
         id = '642d92be-f309-4c4a-9c72-3ceaf43afe1d'

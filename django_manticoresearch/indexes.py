@@ -39,11 +39,46 @@ class ManticoreIndexMeta(type):
         model = getattr(meta, "model", None)
         index_settings = getattr(meta, "index_settings", {})
 
+
         # Collect fields
         fields = ()
         for key, value in list(attrs.items()):
             if isinstance(value, ManticoreField):
                 fields = fields + (value,)
+
+        # Determine the final fields based on Meta.fields or direct_fields
+        if hasattr(meta, "fields") and fields == ():
+            if meta.fields == []:  # Explicitly empty list means autogenerate from model
+                if not model:
+                    raise ValueError("Model must be defined in Meta to use auto-generated fields when Meta.fields is an empty list.")
+                generated_fields = []
+                for f in model._meta.get_fields():
+                    # Skip reverse relations, many-to-many, and other non-concrete/auto-created fields
+                    if not f.concrete or f.auto_created or f.one_to_many or f.many_to_many or f.one_to_one:
+                        continue
+                    # Skip primary key field if it's already handled by id_field logic
+                    if f.primary_key:
+                        continue
+
+                    manticore_field = None
+                    if isinstance(f, (models.AutoField, models.BigAutoField, models.SmallAutoField, models.IntegerField)):
+                        manticore_field = IntegerField(f.name)
+                    elif isinstance(f, (models.CharField, models.TextField, models.UUIDField)):
+                        manticore_field = TextField(f.name)
+                    elif isinstance(f, models.BooleanField):
+                        manticore_field = BooleanField(f.name)
+                    elif isinstance(f, models.DateField):
+                        manticore_field = DateField(f.name)
+                    elif isinstance(f, models.DateTimeField):
+                        manticore_field = DateTimeField(f.name)
+                    # Добавьте дополнительные сопоставления для других типов полей Django, если необходимо
+
+                    if manticore_field:
+                        generated_fields.append(manticore_field)
+                fields = tuple(generated_fields)
+            else:  # User provided specific fields in Meta (non-empty list/tuple)
+                fields = tuple(meta.fields)
+
 
         if model:
             # Получаем объект поля первичного ключа из мета-информации модели
