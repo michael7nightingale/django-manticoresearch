@@ -40,8 +40,8 @@ class Command(BaseCommand):
         if recreate:
             # Drop and recreate all indices
             for index_class in indices:
+                index_name = index_class._index_name
                 try:
-                    index_name = index_class._index_name
                     self.stdout.write(f"Dropping index '{index_name}'...")
                     index = index_class()
                     index.drop_index()
@@ -50,8 +50,8 @@ class Command(BaseCommand):
 
         # Create indices
         for index_class in indices:
+            index_name = index_class._index_name
             try:
-                index_name = index_class._index_name
                 self.stdout.write(f"Creating index '{index_name}'...")
                 index = index_class()
                 index.create_index()

@@ -2,6 +2,8 @@
 
 import manticoresearch
 from manticoresearch.models.insert_document_request import InsertDocumentRequest
+from manticoresearch.models.replace_document_request import ReplaceDocumentRequest
+
 from django.conf import settings
 import logging
 
@@ -93,6 +95,11 @@ class ManticoreConnector:
                 doc=doc
             )
         )
+        # return ReplaceDocumentRequest(
+        #          table=index_name,
+        #          id=id,
+        #          doc=doc
+        #      )
 
     def update(self, index_name: str, document_id: int, document: dict):
         """Update a document in an index."""

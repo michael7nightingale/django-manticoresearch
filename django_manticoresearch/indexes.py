@@ -14,7 +14,8 @@ from django.conf import settings
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django_manticoresearch.connection import ManticoreConnector
-from django_manticoresearch.fields import ManticoreField, BigintField, TextField
+from django_manticoresearch.fields import ManticoreField, BigintField, TextField, IntegerField, BooleanField, DateField, DateTimeField
+
 
 
 
@@ -61,15 +62,16 @@ class ManticoreIndexMeta(type):
                         continue
 
                     manticore_field = None
-                    if isinstance(f, (models.AutoField, models.BigAutoField, models.SmallAutoField, models.IntegerField)):
+                    internal_type = f.get_internal_type()
+                    if internal_type in ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField'):
                         manticore_field = IntegerField(f.name)
-                    elif isinstance(f, (models.CharField, models.TextField, models.UUIDField)):
+                    elif internal_type in ('CharField', 'TextField', 'UUIDField'):
                         manticore_field = TextField(f.name)
-                    elif isinstance(f, models.BooleanField):
+                    elif internal_type == 'BooleanField':
                         manticore_field = BooleanField(f.name)
-                    elif isinstance(f, models.DateField):
+                    elif internal_type == 'DateField':
                         manticore_field = DateField(f.name)
-                    elif isinstance(f, models.DateTimeField):
+                    elif internal_type == 'DateTimeField':
                         manticore_field = DateTimeField(f.name)
                     # Добавьте дополнительные сопоставления для других типов полей Django, если необходимо
 
@@ -394,7 +396,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         root_filters: dict | None = None,
         aggregations: dict | None = None,
     ) -> Dict[str, Any]:
-        """Build search payload from query components.
+        """Build a search payload from query components.
 
         Args:
             query: Search query string
@@ -569,11 +571,11 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         self.raw(f"DELETE FROM {self.index_name} WHERE _id={obj.pk}")
 
     def drop_index(self):
-        """Drop index if it exists."""
+        """Drop Index if it exists."""
         return self.manticore.delete_index(index_name=self.index_name)
 
     def create_index(self):
-        """Create index with fields and configuration."""
+        """Create an Index with fields and configuration."""
         self.logger.info(f"Creating index {self.index_name}")
 
         return self.manticore.create_index(
@@ -591,7 +593,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
     @classmethod
     def handle_save(cls, sender, instance, **kwargs):
-        """Handle post_save signal."""
+        """Handle the post_save signal."""
         index = cls()
 
         try:
@@ -605,7 +607,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
     @classmethod
     def handle_delete(cls, sender, instance, **kwargs):
-        """Handle post_delete signal."""
+        """Handle the post_delete signal."""
         index = cls()
         try:
             index.delete(instance)
