@@ -1,14 +1,22 @@
 """Manticore Search index classes and registry."""
 
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from backports.strenum import StrEnum
+
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import ndjson
+import logging
+
 from django.conf import settings
 from django.db.models import Model
 from django.db.models.signals import post_delete, post_save
 from django_manticoresearch.connection import ManticoreConnector
-from django_manticoresearch.fields import ManticoreField
+from django_manticoresearch.fields import ManticoreField, BigintField, TextField, IntegerField, BooleanField, DateField, DateTimeField
+
+
 
 
 class ManticoreMatchMethodEnum(StrEnum):
@@ -20,6 +28,7 @@ class ManticoreMatchMethodEnum(StrEnum):
 
 class ManticoreIndexMeta(type):
     """Metaclass for ManticoreIndex that collects fields from class attributes."""
+    logger = logging.getLogger(__name__)
 
     def __new__(mcs, name, bases, attrs):
         if name == "ManticoreIndex":
@@ -31,21 +40,75 @@ class ManticoreIndexMeta(type):
         model = getattr(meta, "model", None)
         index_settings = getattr(meta, "index_settings", {})
 
+
         # Collect fields
         fields = ()
         for key, value in list(attrs.items()):
             if isinstance(value, ManticoreField):
                 fields = fields + (value,)
-                # fields[key] = value
-                # Set field name if not already set
-                # if not hasattr(value, "name") or not value.name:
-                #     value.name = key
 
-        has_id_field = any(field.name == "_id" for field in fields)
-        if not has_id_field:
-            from django_manticoresearch.fields import BigintField
+        # Determine the final fields based on Meta.fields or direct_fields
+        if hasattr(meta, "fields") and fields == ():
+            if meta.fields == []:  # Explicitly empty list means autogenerate from model
+                if not model:
+                    raise ValueError("Model must be defined in Meta to use auto-generated fields when Meta.fields is an empty list.")
+                generated_fields = []
+                for f in model._meta.get_fields():
+                    # Skip reverse relations, many-to-many, and other non-concrete/auto-created fields
+                    if not f.concrete or f.auto_created or f.one_to_many or f.many_to_many or f.one_to_one:
+                        continue
+                    # Skip primary key field if it's already handled by id_field logic
+                    if f.primary_key:
+                        continue
 
-            fields = (BigintField("_id", processor=lambda obj: obj.id),) + fields
+                    manticore_field = None
+                    internal_type = f.get_internal_type()
+                    if internal_type in ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField'):
+                        manticore_field = IntegerField(f.name)
+                    elif internal_type in ('CharField', 'TextField', 'UUIDField'):
+                        manticore_field = TextField(f.name)
+                    elif internal_type == 'BooleanField':
+                        manticore_field = BooleanField(f.name)
+                    elif internal_type == 'DateField':
+                        manticore_field = DateField(f.name)
+                    elif internal_type == 'DateTimeField':
+                        manticore_field = DateTimeField(f.name)
+                    # Добавьте дополнительные сопоставления для других типов полей Django, если необходимо
+
+                    if manticore_field:
+                        generated_fields.append(manticore_field)
+                fields = tuple(generated_fields)
+            else:  # User provided specific fields in Meta (non-empty list/tuple)
+                fields = tuple(meta.fields)
+
+
+        if model:
+            # Получаем объект поля первичного ключа из мета-информации модели
+            pk_field = model._meta.pk
+
+            # Список типов полей, которые мы считаем целочисленными
+            integer_pk_types = ('AutoField', 'BigAutoField', 'SmallAutoField', 'IntegerField')
+
+            if pk_field.get_internal_type() in integer_pk_types:
+                # PK - целочисленный. Используем его для ID документа Manticore.
+                #from django_manticoresearch.fields import BigintField
+                # Используем obj.pk вместо obj.id для универсальности
+                id_field = BigintField("_pk", processor=lambda obj: obj.pk)
+            else:
+                # PK - не целочисленный (UUID, CharField и т.д.).
+                # Сохраняем его значение в строковое поле Manticore с именем `_pk`.
+                # ID самого документа будет назначен Manticore автоматически.
+                #from django_manticoresearch.fields import TextField
+                id_field = TextField("_pk", processor=lambda obj: str(obj.pk))
+        else:
+            # Если модель не указана, возвращаемся к старому поведению по умолчанию.
+            #from django_manticoresearch.fields import BigintField
+            id_field = BigintField("_pk", processor=lambda obj: obj.id)
+
+        # Добавляем созданное поле в начало кортежа полей
+        if id_field:
+            fields = (id_field,) + fields
+
 
         fields_map = {field.name: field for field in fields}
 
@@ -81,9 +144,15 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
     _field_weights: Optional[Dict[Union[str, int], Any]] = None
     _index_settings: Optional[dict] = None
 
+    logger = logging.getLogger(__name__)
+
+
     def __init__(self):
         """Initialize Manticore index with connector and fields."""
         self.manticore = ManticoreConnector()
+
+        global hard_exit
+        hard_exit=self.manticore.hard_exit
 
     def get_queryset(self):
         """Get queryset of objects to index.
@@ -108,6 +177,8 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
             batch.append(obj)
         if batch:
             self.bulk(batch)
+        else:
+            return []
 
     @property
     def index_name(self) -> str:
@@ -214,6 +285,41 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
         return " | ".join(result_patterns) if terms else f"*{query}*"
 
+    def search_pk(self, pk):
+
+        pk_manticore_field = self._fields[0]
+
+        if isinstance(pk_manticore_field, BigintField):
+            return pk
+        else:
+            payload = {
+                "index_name": self.index_name,
+                "query": {
+                    "match": {
+                        "_pk": str(pk)
+                    }
+                },
+                "limit": 1
+            }
+            try:
+                search_result = self.manticore.search_raw(**payload)
+
+                if search_result and search_result.hits and search_result.hits.hits:
+                    # Документ найден, используем его Manticore-generated ID для операции
+                    # Доступ к _id через атрибут, а не ключ словаря
+                    self.logger.debug(f"Found existing Manticore ID {id} for _pk={pk}")
+                    return search_result.hits.hits[0].id
+                else:
+                    # Документ не найден, это новая вставка для Manticore, оставляем id=0
+                    self.logger.debug(f"Document with _pk={pk} not found in Manticore, will insert with auto-id.")
+                    return None
+            except Exception as e:
+                error_text=f"Error getting primary key index {self.index_name} for pk: {pk} error: {e}"
+                self.logger.error(error_text)
+                if hard_exit:
+                    raise Exception(error_text)
+                return None
+
     def obj_to_document(self, obj: Model) -> Dict[str, Any]:
         """Convert model object to Manticore document.
 
@@ -223,7 +329,15 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Returns:
             Dictionary representation for Manticore
         """
-        return {field.name: field.process(obj) for field in self._fields}
+
+        document = {field.name: field.process(obj) for field in self._fields}
+        id = self.search_pk(obj.pk)
+
+        result = {
+            'id': id,
+            'doc': document
+        }
+        return result
 
     def insert(self, obj: Model):
         """Insert single object into index.
@@ -231,9 +345,26 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Args:
             obj: Django model instance
         """
+
+        self.logger.debug(f"Insert document: {self.obj_to_document(obj)}")
+
         self.manticore.insert(
             index_name=self.index_name,
-            document=self.obj_to_document(obj),
+            **self.obj_to_document(obj)
+        )
+
+    def replace(self, obj: Model):
+        """Replace single object into index.
+
+        Args:
+            obj: Django model instance
+        """
+
+        self.logger.debug(f"Replace document: {obj.__dict__}")
+
+        self.manticore.replace(
+            index_name=self.index_name,
+            **self.obj_to_document(obj)
         )
 
     def bulk(self, queryset: Sequence[Model]):
@@ -242,13 +373,13 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         Args:
             queryset: Sequence of Django model instances
         """
-        self.manticore.bulk(
+        return self.manticore.bulk(
             ndjson.dumps(
                 [
                     {
-                        "insert": {
+                        "replace": {
                             "index": self.index_name,
-                            "doc": self.obj_to_document(obj),
+                            **self.obj_to_document(obj),
                         }
                     }
                     for obj in queryset
@@ -265,7 +396,7 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         root_filters: dict | None = None,
         aggregations: dict | None = None,
     ) -> Dict[str, Any]:
-        """Build search payload from query components.
+        """Build a search payload from query components.
 
         Args:
             query: Search query string
@@ -440,12 +571,14 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
         self.raw(f"DELETE FROM {self.index_name} WHERE _id={obj.pk}")
 
     def drop_index(self):
-        """Drop index if it exists."""
-        self.raw(f"DROP TABLE IF EXISTS {self.index_name}")
+        """Drop Index if it exists."""
+        return self.manticore.delete_index(index_name=self.index_name)
 
     def create_index(self):
-        """Create index with fields and configuration."""
-        self.manticore.create_index(
+        """Create an Index with fields and configuration."""
+        self.logger.info(f"Creating index {self.index_name}")
+
+        return self.manticore.create_index(
             index_name=self.index_name, field_defs=self.get_field_definitions(), index_defs=self._index_settings
         )
 
@@ -460,37 +593,27 @@ class ManticoreIndex(metaclass=ManticoreIndexMeta):
 
     @classmethod
     def handle_save(cls, sender, instance, **kwargs):
-        """Handle post_save signal."""
+        """Handle the post_save signal."""
         index = cls()
+
         try:
-            # Use the model's primary key as the document ID
-            if kwargs.get("created", False):
-                # Insert new document
-                index.insert(instance)
-            else:
-                # Update existing document
-                # First delete then insert to ensure it's updated properly
-                index.delete(instance)
-                index.insert(instance)
+            index.replace(instance)
         except Exception as e:
             # Log the error instead of crashing
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error updating index {cls._index_name} for {instance}: {e}")
+            error_text=f"Error insert or updating index {cls._index_name} for {instance}: {e}"
+            cls.logger.error(error_text)
+            if hard_exit:
+                raise Exception(error_text)
 
     @classmethod
     def handle_delete(cls, sender, instance, **kwargs):
-        """Handle post_delete signal."""
+        """Handle the post_delete signal."""
         index = cls()
         try:
             index.delete(instance)
         except Exception as e:
             # Log the error instead of crashing
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error deleting from index {cls._index_name} for {instance}: {e}")
+            cls.logger.error(f"Error deleting from index {cls._index_name} for {instance}: {e}")
 
     @classmethod
     def connect_signals(cls):

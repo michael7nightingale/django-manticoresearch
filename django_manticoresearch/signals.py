@@ -55,7 +55,7 @@ class ManticoreSignalProcessor:
                 # Update existing document
                 index_class.update(document_id, document)
 
-        def handle_delete(sender, instance, **kwargs):
+        def handle_delete(sender, instance):
             """Handle post_delete signal."""
             document_id = instance.pk
             index_class.delete(document_id)

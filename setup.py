@@ -2,12 +2,13 @@ from setuptools import find_packages, setup
 
 setup(
     name="django-manticoresearch",
-    version="0.3.2",
+    version="0.3.3",
     packages=find_packages(),
     install_requires=[
         "django>=3.2",
         "manticoresearch>=3.0.0",
         "ndjson>=0.3.1",
+        "backports-strenum (>=1.3.1,<2.0) ; python_version < '3.11'"
     ],
     author="michael7nightingale",
     author_email="suslanchikmopl@gmail.com",

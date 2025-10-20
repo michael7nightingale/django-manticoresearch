@@ -143,14 +143,14 @@ class ManticoreField(ABC):
 class CharField(ManticoreField):
     """Text field for Manticore indexes."""
 
-    manticore_type = "text"
+    manticore_type = "string"
     default_processor = lambda self, value: str(value) if value is not None else ""
 
 
-class TextField(CharField):
+class TextField(ManticoreField):
     """Alias for CharField, for compatibility."""
-
-    pass
+    manticore_type = "text"
+    default_processor = lambda self, value: str(value) if value is not None else ""
 
 
 class TextArrayField(ManticoreField):
@@ -233,6 +233,27 @@ class FloatField(ManticoreField):
             return int(float(value)) if value is not None else 0
         except (ValueError, TypeError):
             return 0
+
+
+class BooleanField(ManticoreField):
+    """Boolean field for Manticore indexes (stored as int in Manticore, 0 or 1)."""
+
+    manticore_type = "bool"
+    default_processor = lambda self, value: 1 if bool(value) else 0
+
+
+class DateField(ManticoreField):
+    """Date field for Manticore indexes (stored as timestamp)."""
+
+    manticore_type = "date"
+    default_processor = lambda self, value: int(value.timestamp()) if value is not None else 0
+
+
+class DateTimeField(ManticoreField):
+    """DateTime field for Manticore indexes (stored as timestamp)."""
+
+    manticore_type = "datetime"
+    default_processor = lambda self, value: int(value.timestamp()) if value is not None else 0
 
 
 class MVAField(ManticoreField):

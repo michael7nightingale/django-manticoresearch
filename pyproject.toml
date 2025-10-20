@@ -41,7 +41,8 @@ exclude = [
     "node_modules",
     "venv",
     "migrations",
-    "old.py"
+    "old.py",
+    "testproject"
 ]
 
 # Same as Black.
